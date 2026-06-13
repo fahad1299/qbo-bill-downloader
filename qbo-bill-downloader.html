@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>QBO Bill Attachment Downloader</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#f0f2f5;
+  --white:#ffffff;
+  --surface:#f8f9fb;
+  --border:#e2e5ec;
+  --border2:#d0d5e0;
+  --accent:#2a7aff;
+  --accent-dark:#1a5fd4;
+  --accent-soft:#e8f0ff;
+  --green:#16a34a;
+  --green-soft:#dcfce7;
+  --orange:#d97706;
+  --orange-soft:#fef3c7;
+  --red:#dc2626;
+  --red-soft:#fee2e2;
+  --text:#0f1523;
+  --text2:#4b5470;
+  --text3:#8b93b0;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Inter',sans-serif;
+  --radius:12px;
+  --shadow:0 1px 4px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.05);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.12);
+}
+
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;padding:32px 20px 60px}
+
+/* Layout */
+.container{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+
+/* Header */
+.header{text-align:center;padding:8px 0 4px}
+.header-eyebrow{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.header h1{font-size:clamp(22px,4vw,32px);font-weight:700;color:var(--text);letter-spacing:-0.5px}
+.header p{color:var(--text2);font-size:15px;margin-top:6px;font-weight:400}
+
+/* Cards */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.card-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-header-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.card-header-icon.blue{background:var(--accent-soft)}
+.card-header-icon.green{background:var(--green-soft)}
+.card-title{font-size:15px;font-weight:600;color:var(--text)}
+.card-sub{font-size:12px;color:var(--text3);margin-top:1px}
+.card-body{padding:20px 24px}
+
+/* Steps indicator */
+.steps{display:flex;gap:0;margin-bottom:4px}
+.step{display:flex;align-items:center;gap:8px;flex:1}
+.step:not(:last-child)::after{content:'';flex:1;height:1px;background:var(--border2);margin:0 8px}
+.step-dot{width:24px;height:24px;border-radius:50%;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:2px solid var(--border2);color:var(--text3);transition:all .2s}
+.step-dot.active{border-color:var(--accent);background:var(--accent);color:#fff}
+.step-dot.done{border-color:var(--green);background:var(--green);color:#fff}
+.step-label{font-size:12px;font-weight:500;color:var(--text3);white-space:nowrap}
+.step.is-active .step-label{color:var(--accent)}
+.step.is-done .step-label{color:var(--green)}
+
+/* Form fields */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid.full{grid-template-columns:1fr}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:12px;font-weight:600;color:var(--text2);letter-spacing:.3px}
+.field input,.field select{
+  padding:9px 12px;border:1px solid var(--border2);border-radius:8px;
+  font-family:var(--sans);font-size:14px;color:var(--text);
+  background:var(--surface);outline:none;transition:border-color .15s,box-shadow .15s;
+}
+.field input:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(42,122,255,.1)}
+.field input.mono{font-family:var(--mono);font-size:13px}
+.field-hint{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* Info box */
+.info-box{background:var(--accent-soft);border:1px solid #c3d7ff;border-radius:8px;padding:12px 16px;font-size:13px;color:#1a4fa8;line-height:1.6}
+.info-box strong{font-weight:600}
+.info-box ol,.info-box ul{padding-left:18px;margin-top:6px}
+.info-box li{margin-bottom:3px}
+.info-box a{color:var(--accent-dark);font-weight:500}
+
+.warn-box{background:var(--orange-soft);border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;font-size:13px;color:#92400e;line-height:1.6}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:8px;font-family:var(--sans);font-size:14px;font-weight:500;cursor:pointer;border:none;transition:all .15s;text-decoration:none}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--accent-dark);transform:translateY(-1px);box-shadow:0 4px 12px rgba(42,122,255,.3)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.btn-ghost:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.btn-ghost:disabled{opacity:.4;cursor:not-allowed}
+.btn-green{background:var(--green);color:#fff}
+.btn-green:hover:not(:disabled){background:#15803d;transform:translateY(-1px)}
+.btn-green:disabled{opacity:.4;cursor:not-allowed}
+.btn-sm{padding:7px 14px;font-size:13px}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+
+/* Token / auth status */
+.auth-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500}
+.auth-badge.connected{background:var(--green-soft);color:var(--green)}
+.auth-badge.disconnected{background:var(--red-soft);color:var(--red)}
+
+/* Log / progress */
+.log-box{background:#0f1523;border-radius:8px;padding:14px 16px;font-family:var(--mono);font-size:12px;line-height:1.8;max-height:260px;overflow-y:auto;color:#a8b4d0}
+.log-box .log-ok{color:#4ade80}
+.log-box .log-warn{color:#fbbf24}
+.log-box .log-err{color:#f87171}
+.log-box .log-info{color:#60a5fa}
+.log-box .log-dim{color:#4b5470}
+.log-box::-webkit-scrollbar{width:4px}
+.log-box::-webkit-scrollbar-thumb{background:#2a3050;border-radius:4px}
+
+/* Progress bar */
+.progress-wrap{margin-top:12px}
+.progress-label{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:5px}
+.progress-track{height:6px;background:var(--border);border-radius:6px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),#6366f1);border-radius:6px;transition:width .4s ease}
+
+/* Results table */
+.table-wrap{overflow-x:auto;margin-top:4px;border-radius:8px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{background:var(--surface)}
+th{padding:9px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafbff}
+.td-mono{font-family:var(--mono);font-size:12px}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.tag-ok{background:var(--green-soft);color:var(--green)}
+.tag-fail{background:var(--red-soft);color:var(--red)}
+.tag-skip{background:var(--orange-soft);color:var(--orange)}
+
+/* Stat cards */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.stat-num{font-size:26px;font-weight:700;color:var(--text);letter-spacing:-1px}
+.stat-label{font-size:11px;font-weight:500;color:var(--text3);margin-top:2px}
+
+/* Divider */
+.divider{height:1px;background:var(--border);margin:4px 0}
+
+/* Spinner */
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Date range */
+.date-range-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.date-range-row .field{flex:1;min-width:140px}
+
+/* Collapsible setup */
+.collapse-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between}
+.collapse-toggle .chevron{transition:transform .2s;color:var(--text3);font-size:12px}
+.collapse-toggle.open .chevron{transform:rotate(180deg)}
+.collapse-body{overflow:hidden;transition:max-height .3s ease;max-height:0}
+.collapse-body.open{max-height:800px}
+
+@media(max-width:600px){
+  .form-grid{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:1fr 1fr}
+  body{padding:16px 12px 40px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-eyebrow">QuickBooks Online → DATEV</div>
+    <h1>Bill Attachment Bulk Downloader</h1>
+    <p>Connect your QBO account · fetch all bill PDFs · auto-rename to <code style="font-family:var(--mono);font-size:13px;background:var(--border);padding:1px 6px;border-radius:4px">InvoiceNo_VendorName.pdf</code></p>
+  </div>
+
+  <!-- Steps -->
+  <div class="steps" id="stepsBar">
+    <div class="step is-active" id="step1">
+      <div class="step-dot active">1</div>
+      <span class="step-label">Setup API</span>
+    </div>
+    <div class="step" id="step2">
+      <div class="step-dot">2</div>
+      <span class="step-label">Connect QBO</span>
+    </div>
+    <div class="step" id="step3">
+      <div class="step-dot">3</div>
+      <span class="step-label">Filter &amp; Fetch</span>
+    </div>
+    <div class="step" id="step4">
+      <div class="step-dot">4</div>
+      <span class="step-label">Download</span>
+    </div>
+  </div>
+
+  <!-- STEP 1: Setup -->
+  <div class="card" id="cardSetup">
+    <div class="card-header">
+      <div class="card-header-icon blue">⚙️</div>
+      <div>
+        <div class="card-title">Step 1 — Intuit Developer App Credentials</div>
+        <div class="card-sub">Enter your Client ID &amp; Secret from developer.intuit.com</div>
+      </div>
+      <div id="authBadge" class="auth-badge disconnected" style="margin-left:auto">● Not connected</div>
+    </div>
+    <div class="card-body">
+      <div class="info-box" style="margin-bottom:16px">
+        <strong>First time? Here's how to get your credentials:</strong>
+        <ol>
+          <li>Go to <a href="https://developer.intuit.com" target="_blank">developer.intuit.com</a> → Sign in → My Apps → Create an app</li>
+          <li>Choose <strong>QuickBooks Online and Payments</strong></li>
+          <li>Under <em>Keys & credentials</em>, copy your <strong>Client ID</strong> and <strong>Client Secret</strong></li>
+          <li>Under <em>Redirect URIs</em>, add: <code id="redirectUriDisplay" style="font-family:var(--mono);font-size:12px;background:rgba(0,0,0,.07);padding:1px 5px;border-radius:3px"></code></li>
+          <li>Set scopes: <strong>com.intuit.quickbooks.accounting</strong></li>
+        </ol>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Client ID</label>
+          <input class="mono" type="text" id="clientId" placeholder="ABCdef1234…" autocomplete="off"/>
+        </div>
+        <div class="field">
+          <label>Client Secret</label>
+          <input class="mono" type="password" id="clientSecret" placeholder="••••••••••••" autocomplete="off"/>
+        </div>
+        <div class="field">
+          <label>Environment</label>
+          <select id="envSelect">
+            <option value="sandbox">Sandbox (testing)</option>
+            <option value="production" selected>Production (live data)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Company ID (Realm ID) <span style="font-weight:400;color:var(--text3)">— found in QBO URL</span></label>
+          <input class="mono" type="text" id="realmId" placeholder="1234567890"/>
+          <span class="field-hint">In QBO, look at the URL: …quickbooks.intuit.com/app/…?companyId=<strong>THIS</strong></span>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="startOAuth()">🔗 Connect to QuickBooks</button>
+        <span style="font-size:13px;color:var(--text3)">You'll be redirected to Intuit to authorize access</span>
+      </div>
+
+      <!-- Manual token entry for users who already have tokens -->
+      <div style="margin-top:20px">
+        <div class="collapse-toggle" onclick="toggleCollapse('manualTokens', this)" id="manualToggle">
+          <span style="font-size:13px;font-weight:500;color:var(--text2)">Already have an access token? Enter manually ▾</span>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="collapse-body" id="manualTokens">
+          <div style="padding-top:14px">
+            <div class="warn-box" style="margin-bottom:14px">
+              Access tokens expire in <strong>1 hour</strong>. Use the OAuth button above for a seamless experience. Paste tokens here only if you've obtained them via another flow.
+            </div>
+            <div class="form-grid full">
+              <div class="field">
+                <label>Access Token</label>
+                <input class="mono" type="password" id="accessToken" placeholder="eyJlbmMiOiJBMTI4Q0JDLUhTMjU2…"/>
+              </div>
+              <div class="field">
+                <label>Refresh Token <span style="font-weight:400;color:var(--text3)">(optional, for auto-refresh)</span></label>
+                <input class="mono" type="password" id="refreshToken" placeholder="AB11728xxxxxxxx"/>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-ghost btn-sm" onclick="saveManualTokens()">✓ Save Tokens</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: OAuth callback (shown after redirect) -->
+  <div class="card" id="cardOAuth" style="display:none">
+    <div class="card-header">
+      <div class="card-header-icon blue">🔑</div>
+      <div>
+        <div class="card-title">Step 2 — Authorization Callback</div>
+        <div class="card-sub">Exchange the authorization code for tokens</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="info-box" style="margin-bottom:16px">
+        <strong>After authorizing in QBO:</strong> Intuit redirects back here with a <code>code</code> parameter in the URL.
+        Because this is a client-side app, you need to paste the full redirect URL (or just the <code>code</code> value) below.
+      </div>
+      <div class="form-grid full">
+        <div class="field">
+          <label>Authorization Code (from redirect URL <code>?code=…</code>)</label>
+          <input class="mono" type="text" id="authCode" placeholder="AB11728xxxxxxxx"/>
+          <span class="field-hint">After authorizing, copy the <strong>code</strong> value from the browser URL bar and paste it here</span>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="exchangeCode()">🔓 Exchange Code for Tokens</button>
+      </div>
+      <div id="oauthLog" style="margin-top:12px;display:none"></div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Filter & Fetch -->
+  <div class="card" id="cardFetch" style="display:none">
+    <div class="card-header">
+      <div class="card-header-icon blue">📋</div>
+      <div>
+        <div class="card-title">Step 3 — Filter Bills &amp; Fetch Attachments</div>
+        <div class="card-sub">Set date range and vendor filters, then fetch bill list from QBO</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="date-range-row">
+        <div class="field">
+          <label>Bill Date — From</label>
+          <input type="date" id="dateFrom"/>
+        </div>
+        <div class="field">
+          <label>Bill Date — To</label>
+          <input type="date" id="dateTo"/>
+        </div>
+        <div class="field" style="flex:2">
+          <label>Vendor Name Filter <span style="font-weight:400;color:var(--text3)">(leave blank = all vendors)</span></label>
+          <input type="text" id="vendorFilter" placeholder="e.g. Bosch, Deutsche Telekom"/>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:14px">
+        <div class="field">
+          <label>Max Bills to Fetch</label>
+          <select id="maxBills">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="200">200</option>
+            <option value="500">500</option>
+            <option value="1000">1000 (all)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Only bills WITH attachments</label>
+          <select id="attachedOnly">
+            <option value="true" selected>Yes — skip bills without PDFs</option>
+            <option value="false">No — list all bills</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="fetchBtn" onclick="fetchBills()">🔍 Fetch Bills from QBO</button>
+        <button class="btn btn-ghost" onclick="resetAll()">↺ Reset</button>
+      </div>
+      <div id="fetchLog" style="margin-top:14px;display:none">
+        <div class="log-box" id="fetchLogBox"></div>
+        <div class="progress-wrap" id="fetchProgress" style="display:none">
+          <div class="progress-label"><span id="progressText">Fetching…</span><span id="progressPct">0%</span></div>
+          <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div id="statsSection" style="display:none">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-num" id="statTotal">0</div><div class="stat-label">Bills Found</div></div>
+      <div class="stat-card"><div class="stat-num" id="statAttached">0</div><div class="stat-label">With Attachments</div></div>
+      <div class="stat-card"><div class="stat-num" id="statDone" style="color:var(--green)">0</div><div class="stat-label">Downloaded</div></div>
+      <div class="stat-card"><div class="stat-num" id="statFailed" style="color:var(--red)">0</div><div class="stat-label">Failed / Skipped</div></div>
+    </div>
+  </div>
+
+  <!-- STEP 4: Results & Download -->
+  <div class="card" id="cardResults" style="display:none">
+    <div class="card-header">
+      <div class="card-header-icon green">⬇️</div>
+      <div>
+        <div class="card-title">Step 4 — Bill Attachments</div>
+        <div class="card-sub">Review the list and download all PDFs with auto-renamed filenames</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="btn-row" style="margin-top:0;margin-bottom:16px">
+        <button class="btn btn-green" id="downloadAllBtn" onclick="downloadAll()">⬇ Download All PDFs</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📊 Export List as CSV</button>
+        <span id="downloadStatus" style="font-size:13px;color:var(--text2)"></span>
+      </div>
+      <div id="downloadLog" style="display:none;margin-bottom:14px">
+        <div class="log-box" id="downloadLogBox"></div>
+        <div class="progress-wrap">
+          <div class="progress-label"><span id="dlProgressText">Downloading…</span><span id="dlProgressPct">0%</span></div>
+          <div class="progress-track"><div class="progress-fill" id="dlProgressFill" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Vendor</th>
+              <th>Invoice No.</th>
+              <th>Bill Date</th>
+              <th>Amount</th>
+              <th>Renamed File</th>
+              <th>Attachment</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Toast -->
+<div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#0f1523;color:#e8eaf0;border:1px solid #2a3050;border-radius:8px;padding:11px 20px;font-size:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);transition:transform .3s;z-index:999;white-space:nowrap"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────
+const S = {
+  clientId: '', clientSecret: '', realmId: '', env: 'production',
+  accessToken: '', refreshToken: '',
+  bills: [],      // fetched bill records
+  step: 1
+};
+
+// QBO API base URLs
+const BASE = {
+  sandbox: 'https://sandbox-quickbooks.api.intuit.com',
+  production: 'https://quickbooks.api.intuit.com'
+};
+const AUTH_URL = 'https://appcenter.intuit.com/connect/oauth2';
+const TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  // Set redirect URI display
+  const ru = window.location.href.split('?')[0];
+  document.getElementById('redirectUriDisplay').textContent = ru;
+
+  // Set default dates (current month)
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  document.getElementById('dateFrom').value = new Date(y, m, 1).toISOString().slice(0,10);
+  document.getElementById('dateTo').value = new Date(y, m+1, 0).toISOString().slice(0,10);
+
+  // Check for OAuth callback
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('code')) {
+    document.getElementById('authCode').value = params.get('code');
+    if (params.get('realmId')) document.getElementById('realmId').value = params.get('realmId');
+    loadSaved();
+    document.getElementById('cardOAuth').style.display = 'block';
+    setStep(2);
+    window.history.replaceState({}, '', window.location.pathname);
+  } else {
+    loadSaved();
+  }
+});
+
+function loadSaved() {
+  const saved = JSON.parse(localStorage.getItem('qbo_creds') || '{}');
+  if (saved.clientId) document.getElementById('clientId').value = saved.clientId;
+  if (saved.realmId) document.getElementById('realmId').value = saved.realmId;
+  if (saved.env) document.getElementById('envSelect').value = saved.env;
+  if (saved.accessToken) {
+    S.accessToken = saved.accessToken;
+    S.refreshToken = saved.refreshToken || '';
+    S.realmId = saved.realmId || '';
+    S.env = saved.env || 'production';
+    S.clientId = saved.clientId || '';
+    S.clientSecret = saved.clientSecret || '';
+    if (S.accessToken) showConnected();
+  }
+}
+
+function saveCreds() {
+  localStorage.setItem('qbo_creds', JSON.stringify({
+    clientId: S.clientId, realmId: S.realmId, env: S.env,
+    accessToken: S.accessToken, refreshToken: S.refreshToken,
+    clientSecret: S.clientSecret
+  }));
+}
+
+// ─── OAuth Flow ───────────────────────────────────────────────────────────
+function startOAuth() {
+  S.clientId = document.getElementById('clientId').value.trim();
+  S.clientSecret = document.getElementById('clientSecret').value.trim();
+  S.realmId = document.getElementById('realmId').value.trim();
+  S.env = document.getElementById('envSelect').value;
+
+  if (!S.clientId || !S.clientSecret) return showToast('⚠️ Enter Client ID and Secret first');
+
+  const redirectUri = window.location.href.split('?')[0];
+  const scope = 'com.intuit.quickbooks.accounting';
+  const state = crypto.randomUUID();
+  sessionStorage.setItem('oauth_state', state);
+
+  // Save partial creds before redirect
+  localStorage.setItem('qbo_creds', JSON.stringify({ clientId: S.clientId, clientSecret: S.clientSecret, realmId: S.realmId, env: S.env }));
+
+  const url = `${AUTH_URL}?client_id=${encodeURIComponent(S.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
+  window.location.href = url;
+}
+
+async function exchangeCode() {
+  const code = document.getElementById('authCode').value.trim();
+  if (!code) return showToast('⚠️ Paste the authorization code first');
+
+  loadSaved();
+  S.realmId = document.getElementById('realmId').value.trim() || S.realmId;
+
+  const logEl = document.getElementById('oauthLog');
+  logEl.style.display = 'block';
+  logEl.innerHTML = '<div class="log-box"><span class="log-info">Exchanging code for tokens…</span></div>';
+
+  const redirectUri = window.location.href.split('?')[0];
+  const creds = btoa(`${S.clientId}:${S.clientSecret}`);
+
+  try {
+    // Note: QBO token exchange requires server-side due to CORS. We guide user to use a proxy.
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri
+    });
+
+    const resp = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${creds}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body
+    });
+
+    if (!resp.ok) {
+      // CORS error expected — guide user
+      throw new Error(`Token exchange failed (${resp.status}). See instructions below.`);
+    }
+
+    const data = await resp.json();
+    S.accessToken = data.access_token;
+    S.refreshToken = data.refresh_token || '';
+    saveCreds();
+    showConnected();
+    logEl.innerHTML = '<div class="log-box"><span class="log-ok">✓ Tokens obtained! You are now connected.</span></div>';
+    setStep(3);
+    document.getElementById('cardFetch').style.display = 'block';
+
+  } catch(err) {
+    logEl.innerHTML = `
+      <div class="log-box">
+        <span class="log-warn">⚠ Direct token exchange blocked by CORS (browser limitation).</span><br>
+        <span class="log-info">Use the manual token method:</span><br>
+        <span class="log-dim">1. Use Postman or curl to exchange the code (see README below)</span><br>
+        <span class="log-dim">2. Paste the access_token in the manual token field in Step 1</span>
+      </div>
+      <div class="warn-box" style="margin-top:10px">
+        <strong>curl command to run in terminal:</strong><br>
+        <code style="font-family:var(--mono);font-size:12px;display:block;margin-top:6px;word-break:break-all">
+curl -X POST https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer \\<br>
+&nbsp;-H "Authorization: Basic $(echo -n '${S.clientId}:${S.clientSecret}' | base64)" \\<br>
+&nbsp;-H "Content-Type: application/x-www-form-urlencoded" \\<br>
+&nbsp;-d "grant_type=authorization_code&code=${code}&redirect_uri=${encodeURIComponent(redirectUri)}"
+        </code>
+        <br>Copy the <strong>access_token</strong> from the response and paste it in the manual token field.
+      </div>`;
+  }
+}
+
+function saveManualTokens() {
+  S.accessToken = document.getElementById('accessToken').value.trim();
+  S.refreshToken = document.getElementById('refreshToken').value.trim();
+  S.clientId = document.getElementById('clientId').value.trim();
+  S.clientSecret = document.getElementById('clientSecret').value.trim();
+  S.realmId = document.getElementById('realmId').value.trim();
+  S.env = document.getElementById('envSelect').value;
+  if (!S.accessToken) return showToast('⚠️ Paste your access token');
+  if (!S.realmId) return showToast('⚠️ Enter your Company (Realm) ID');
+  saveCreds();
+  showConnected();
+  setStep(3);
+  document.getElementById('cardFetch').style.display = 'block';
+  showToast('✅ Tokens saved!');
+}
+
+function showConnected() {
+  const b = document.getElementById('authBadge');
+  b.className = 'auth-badge connected';
+  b.textContent = '● Connected';
+}
+
+// ─── QBO API calls ────────────────────────────────────────────────────────
+async function qboQuery(sql) {
+  const base = BASE[S.env];
+  const url = `${base}/v3/company/${S.realmId}/query?query=${encodeURIComponent(sql)}&minorversion=65`;
+  const resp = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${S.accessToken}`,
+      'Accept': 'application/json'
+    }
+  });
+  if (resp.status === 401) throw new Error('Token expired. Please reconnect.');
+  if (!resp.ok) throw new Error(`QBO API error ${resp.status}: ${await resp.text()}`);
+  return resp.json();
+}
+
+async function getAttachments(entityId, entityType = 'Bill') {
+  const sql = `SELECT * FROM Attachable WHERE AttachableRef.EntityRef.Type = '${entityType}' AND AttachableRef.EntityRef.value = '${entityId}'`;
+  const data = await qboQuery(sql);
+  return data.QueryResponse?.Attachable || [];
+}
+
+async function downloadAttachment(attachable) {
+  const base = BASE[S.env];
+  const url = `${base}/v3/company/${S.realmId}/download/${attachable.Id}`;
+  const resp = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${S.accessToken}` }
+  });
+  if (!resp.ok) throw new Error(`Download failed ${resp.status}`);
+  return resp.blob();
+}
+
+// ─── Fetch Bills ──────────────────────────────────────────────────────────
+async function fetchBills() {
+  if (!S.accessToken) return showToast('⚠️ Connect to QBO first');
+  if (!S.realmId) { S.realmId = document.getElementById('realmId').value.trim(); }
+  if (!S.realmId) return showToast('⚠️ Enter your Company (Realm) ID');
+  S.env = document.getElementById('envSelect').value;
+
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo = document.getElementById('dateTo').value;
+  const vendorFilter = document.getElementById('vendorFilter').value.trim();
+  const maxBills = parseInt(document.getElementById('maxBills').value);
+
+  const logEl = document.getElementById('fetchLogBox');
+  document.getElementById('fetchLog').style.display = 'block';
+  document.getElementById('fetchProgress').style.display = 'block';
+  document.getElementById('fetchBtn').disabled = true;
+  logEl.innerHTML = '';
+
+  function log(msg, cls='') {
+    logEl.innerHTML += `<div class="${cls}">${msg}</div>`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setProgress(pct, text) {
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = pct + '%';
+    document.getElementById('progressText').textContent = text;
+  }
+
+  try {
+    log('<span class="log-info">Querying QuickBooks Online for bills…</span>');
+
+    // Build SQL query
+    let conditions = [];
+    if (dateFrom) conditions.push(`TxnDate >= '${dateFrom}'`);
+    if (dateTo) conditions.push(`TxnDate <= '${dateTo}'`);
+    if (vendorFilter) conditions.push(`VendorRef.name LIKE '%${vendorFilter}%'`);
+    const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
+    const sql = `SELECT * FROM Bill${where} ORDERBY TxnDate DESC MAXRESULTS ${maxBills}`;
+
+    log(`<span class="log-dim">SQL: ${sql}</span>`);
+    setProgress(10, 'Fetching bill list…');
+
+    const data = await qboQuery(sql);
+    const bills = data.QueryResponse?.Bill || [];
+    log(`<span class="log-ok">✓ Found ${bills.length} bill(s)</span>`);
+    setProgress(30, `Found ${bills.length} bills, checking attachments…`);
+
+    document.getElementById('statsSection').style.display = 'block';
+    document.getElementById('statTotal').textContent = bills.length;
+
+    // Fetch attachments for each bill
+    S.bills = [];
+    let attachedCount = 0;
+    for (let i = 0; i < bills.length; i++) {
+      const bill = bills[i];
+      const vendor = bill.VendorRef?.name || 'Unknown Vendor';
+      const invoiceNo = bill.DocNumber || bill.Id;
+      const txnDate = bill.TxnDate || '';
+      const amount = bill.TotalAmt || 0;
+      const currency = bill.CurrencyRef?.value || 'USD';
+
+      log(`<span class="log-dim">[${i+1}/${bills.length}] Checking ${vendor} — ${invoiceNo}…</span>`);
+      setProgress(30 + Math.round((i/bills.length)*50), `Checking attachments… ${i+1}/${bills.length}`);
+
+      let attachments = [];
+      try {
+        attachments = await getAttachments(bill.Id);
+      } catch(e) {
+        log(`<span class="log-warn">  ⚠ Could not fetch attachments: ${e.message}</span>`);
+      }
+
+      const pdfAttachments = attachments.filter(a =>
+        a.FileName?.toLowerCase().endsWith('.pdf') ||
+        a.ContentType === 'application/pdf' ||
+        a.ContentType === 'application/octet-stream'
+      );
+
+      if (pdfAttachments.length > 0) attachedCount++;
+
+      const attachOnly = document.getElementById('attachedOnly').value === 'true';
+      if (attachOnly && pdfAttachments.length === 0) continue;
+
+      S.bills.push({
+        id: bill.Id,
+        vendor, invoiceNo, txnDate, amount, currency,
+        attachments: pdfAttachments,
+        renamedBase: sanitizeName(invoiceNo, vendor),
+        status: pdfAttachments.length > 0 ? 'ready' : 'no-attachment'
+      });
+    }
+
+    document.getElementById('statAttached').textContent = attachedCount;
+    log(`<span class="log-ok">✓ Done! ${attachedCount} bills with PDF attachments.</span>`);
+    setProgress(100, 'Complete');
+
+    renderResults();
+    setStep(4);
+    document.getElementById('cardResults').style.display = 'block';
+
+  } catch(err) {
+    log(`<span class="log-err">✗ Error: ${err.message}</span>`);
+    showToast('❌ ' + err.message);
+  } finally {
+    document.getElementById('fetchBtn').disabled = false;
+  }
+}
+
+// ─── Render Results ───────────────────────────────────────────────────────
+function renderResults() {
+  const tbody = document.getElementById('resultsBody');
+  tbody.innerHTML = '';
+
+  S.bills.forEach((b, i) => {
+    const hasAttachment = b.attachments.length > 0;
+    const filename = hasAttachment
+      ? (b.attachments.length > 1 ? b.renamedBase + '_[' + b.attachments.length + ' files].pdf' : b.renamedBase + '.pdf')
+      : '—';
+
+    const tr = document.createElement('tr');
+    tr.id = `row-${b.id}`;
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td><strong>${esc(b.vendor)}</strong></td>
+      <td class="td-mono">${esc(b.invoiceNo)}</td>
+      <td class="td-mono">${b.txnDate}</td>
+      <td class="td-mono">${b.currency} ${Number(b.amount).toLocaleString('de-DE',{minimumFractionDigits:2})}</td>
+      <td class="td-mono" style="color:${hasAttachment?'var(--green)':'var(--text3)'};font-size:12px">${esc(filename)}</td>
+      <td><span style="font-size:12px;color:var(--text2)">${b.attachments.length} PDF${b.attachments.length!==1?'s':''}</span></td>
+      <td><span class="tag ${hasAttachment?'tag-ok':'tag-skip'}" id="tag-${b.id}">${hasAttachment?'Ready':'No PDF'}</span></td>
+      <td>${hasAttachment ? `<button class="btn btn-ghost btn-sm" onclick="downloadSingle('${b.id}')">⬇</button>` : ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  updateStats();
+}
+
+// ─── Download ─────────────────────────────────────────────────────────────
+async function downloadAll() {
+  const ready = S.bills.filter(b => b.attachments.length > 0 && b.status !== 'done');
+  if (!ready.length) return showToast('No PDFs to download');
+
+  document.getElementById('downloadLog').style.display = 'block';
+  document.getElementById('downloadAllBtn').disabled = true;
+  const logEl = document.getElementById('downloadLogBox');
+  logEl.innerHTML = '';
+
+  function dlLog(msg, cls='') {
+    logEl.innerHTML += `<div class="${cls}">${msg}</div>`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  let done = 0, failed = 0;
+  for (let i = 0; i < ready.length; i++) {
+    const b = ready[i];
+    const pct = Math.round(((i+1)/ready.length)*100);
+    document.getElementById('dlProgressFill').style.width = pct+'%';
+    document.getElementById('dlProgressPct').textContent = pct+'%';
+    document.getElementById('dlProgressText').textContent = `Downloading ${i+1}/${ready.length}…`;
+
+    for (let j = 0; j < b.attachments.length; j++) {
+      const att = b.attachments[j];
+      const suffix = b.attachments.length > 1 ? `_${j+1}` : '';
+      const fname = b.renamedBase + suffix + '.pdf';
+
+      dlLog(`<span class="log-dim">⬇ ${fname}…</span>`);
+      try {
+        const blob = await downloadAttachment(att);
+        triggerDownload(blob, fname);
+        done++;
+        dlLog(`<span class="log-ok">✓ ${fname}</span>`);
+        setTag(b.id, 'Done', 'tag-ok');
+        b.status = 'done';
+        document.getElementById('statDone').textContent = done;
+        await sleep(350); // polite rate limit
+      } catch(err) {
+        failed++;
+        dlLog(`<span class="log-err">✗ ${fname}: ${err.message}</span>`);
+        setTag(b.id, 'Failed', 'tag-fail');
+        document.getElementById('statFailed').textContent = failed;
+      }
+    }
+  }
+
+  dlLog(`<span class="log-ok">═══ Complete: ${done} downloaded, ${failed} failed ═══</span>`);
+  document.getElementById('downloadAllBtn').disabled = false;
+  showToast(`✅ ${done} file${done!==1?'s':''} downloaded!`);
+}
+
+async function downloadSingle(billId) {
+  const b = S.bills.find(x => x.id === billId);
+  if (!b || !b.attachments.length) return;
+
+  for (let j = 0; j < b.attachments.length; j++) {
+    const att = b.attachments[j];
+    const suffix = b.attachments.length > 1 ? `_${j+1}` : '';
+    const fname = b.renamedBase + suffix + '.pdf';
+    try {
+      const blob = await downloadAttachment(att);
+      triggerDownload(blob, fname);
+      setTag(b.id, 'Done', 'tag-ok');
+      b.status = 'done';
+      updateStats();
+    } catch(err) {
+      showToast('❌ ' + err.message);
+    }
+  }
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// ─── Export CSV ───────────────────────────────────────────────────────────
+function exportCSV() {
+  const rows = [['#','Vendor','Invoice No','Bill Date','Amount','Currency','Renamed File','Attachments','Status']];
+  S.bills.forEach((b,i) => {
+    rows.push([
+      i+1, b.vendor, b.invoiceNo, b.txnDate,
+      b.amount, b.currency,
+      b.attachments.length ? b.renamedBase+'.pdf' : '',
+      b.attachments.length,
+      b.status
+    ]);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  triggerDownload(blob, `QBO_Bills_${new Date().toISOString().slice(0,10)}.csv`);
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+function sanitizeName(invoiceNo, vendor) {
+  const clean = s => (s||'UNKNOWN')
+    .replace(/[\\/:*?"<>|]/g,'-')
+    .replace(/\s+/g,'_')
+    .replace(/_+/g,'_')
+    .replace(/-+/g,'-')
+    .trim();
+  return `${clean(invoiceNo)}_${clean(vendor)}`;
+}
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function setTag(id, label, cls) {
+  const el = document.getElementById('tag-'+id);
+  if (el) { el.className = 'tag ' + cls; el.textContent = label; }
+}
+
+function updateStats() {
+  const done = S.bills.filter(b=>b.status==='done').length;
+  const failed = S.bills.filter(b=>b.status==='failed').length;
+  document.getElementById('statDone').textContent = done;
+  document.getElementById('statFailed').textContent = failed;
+}
+
+function setStep(n) {
+  S.step = n;
+  for (let i = 1; i <= 4; i++) {
+    const stepEl = document.getElementById('step'+i);
+    const dot = stepEl.querySelector('.step-dot');
+    stepEl.className = 'step' + (i===n?' is-active':i<n?' is-done':'');
+    dot.className = 'step-dot' + (i===n?' active':i<n?' done':'');
+    dot.textContent = i < n ? '✓' : i;
+  }
+}
+
+function resetAll() {
+  S.bills = [];
+  document.getElementById('cardResults').style.display = 'none';
+  document.getElementById('statsSection').style.display = 'none';
+  document.getElementById('fetchLog').style.display = 'none';
+  document.getElementById('downloadLog').style.display = 'none';
+  document.getElementById('fetchLogBox').innerHTML = '';
+  document.getElementById('resultsBody').innerHTML = '';
+  setStep(3);
+}
+
+function toggleCollapse(id, btn) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+  btn.classList.toggle('open');
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.transform = 'translateX(-50%) translateY(80px)'; }, 3500);
+}
+</script>
+</body>
+</html>
